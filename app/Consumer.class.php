@@ -38,27 +38,41 @@ class Consumer {
 	
 		// Init some things
 		$lastCheck = 0;
+		$errorCount = 0;
+		$errorLimit = 3;
 		
 		// Infinite loop
 		while (TRUE) {
-			
-			// Keep the DB tidy. Remove entries older than EXPIRATION_DAYS days.
-			$this->cleanUp();
-	
-			// Get a list of queue files
-			$queueFiles = glob($this->_queueDir . '/' . $this->_filePattern);
-			$lastCheck = time();
-			
-			Logger::debug('Found ' . count($queueFiles) . ' queue files to process...');
-			
-			// Iterate over each file (if any)
-			foreach ($queueFiles as $queueFile) {
-				$this->processQueueFile($queueFile);		
-			}
+			try {
+				// Keep the DB tidy. Remove entries older than EXPIRATION_DAYS days.
+				$this->cleanUp();
+		
+				// Get a list of queue files
+				$queueFiles = glob($this->_queueDir . '/' . $this->_filePattern);
+				$lastCheck = time();
+				
+				Logger::debug('Found ' . count($queueFiles) . ' queue files to process...');
+				
+				// Iterate over each file (if any)
+				foreach ($queueFiles as $queueFile) {
+					$this->processQueueFile($queueFile);		
+				}
 
-			// Check for SIGTERM to shut down gracefully
-			if ($this->_pcntlEnabled == TRUE) {
-				$this->handleSignals();
+				// Check for SIGTERM to shut down gracefully
+				if ($this->_pcntlEnabled == TRUE) {
+					$this->handleSignals();
+				}
+				$errorCount = 0;
+			}
+			catch(\PDOException $e){
+				++$errorCount;
+				if($errorCount > $errorLimit) {
+					$msg = 'Exceeded consecutive error limit of ' . $errorLimit . '. Last error: ' . $e->getMessage();
+					Logger::fatal($msg);
+					die($e);
+				}
+				Logger::error($e->getMessage());
+				$lastCheck = time();
 			}
 	
 			// Wait until ready for next check
