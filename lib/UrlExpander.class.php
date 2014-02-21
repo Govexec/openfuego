@@ -1,6 +1,6 @@
 <?php namespace OpenFuego\lib;
 
-class UrlExpander {
+class UrlExpander extends DbUser {
 
 	const BITLY_API_ROOT = 'https://api-ssl.bitly.com/v3/';
 	const GOOGL_API_ROOT = 'https://www.googleapis.com/urlshortener/v1/url';
@@ -8,13 +8,12 @@ class UrlExpander {
 	const SUPR_API_ROOT = 'http://su.pr/api/expand?version=1.0';
 
 	protected $_curl;
-	protected $_dbh;
 	protected $_bitly_pro_domains;
 	protected $_short_domains;
 	protected $_bitly_username;
 	protected $_bitly_api_key;
 	protected $_googl_api_key;
-	
+
 
 	 public function __construct() {
 		$this->_bitly_pro_domains = unserialize(\OpenFuego\BITLY_PRO_DOMAINS);
@@ -23,7 +22,7 @@ class UrlExpander {
 		if (defined('\OpenFuego\BITLY_USERNAME')) {
 			 $this->_bitly_username = \OpenFuego\BITLY_USERNAME;
 		}
-		
+
 		if (defined('\OpenFuego\BITLY_API_KEY')) {
 			$this->_bitly_api_key = \OpenFuego\BITLY_API_KEY;
 		}
@@ -58,16 +57,14 @@ class UrlExpander {
 			return $canonicalUrl;
 		}
 
-		$dbh = $this->getDbh();
 		$sql = "
 			SELECT long_url
 			FROM openfuego_short_links
 			WHERE input_url = :input_url
 			LIMIT 1;
 		";
-		$sth = $dbh->prepare($sql);
-		$sth->bindParam('input_url', $inputUrl);
-		$sth->execute();
+		$params = array('input_url' => array('value' => $inputUrl));
+		$sth = $this->execute($sql, $params);
 		$cachedUrl = $sth->fetchColumn(0);
 
 		if ($cachedUrl) {  // if it exists in cache...
@@ -104,7 +101,7 @@ class UrlExpander {
 		// done looping through expansion options. now, do we have a canonical URL?
 		if ($longUrl) {
 			$canonicalUrl = $this->getCanonical($longUrl);
-			
+
 			$outputUrl = $canonicalUrl ? $canonicalUrl : $longUrl;
 
 			try {
@@ -112,10 +109,11 @@ class UrlExpander {
 					INSERT INTO openfuego_short_links (input_url, long_url)
 					VALUES (:input_url, :output_url);
 				";
-				$sth = $dbh->prepare($sql);
-				$sth->bindParam(':input_url', $inputUrl);
-				$sth->bindParam(':output_url', $outputUrl);
-				$sth->execute();
+				$params = array(
+					'input_url' => array('value' => $inputUrl),
+					'output_url' => array('value' => $outputUrl),
+				);
+				$sth = $this->execute($sql, $params);
 
 				return $outputUrl;
 
@@ -139,7 +137,7 @@ class UrlExpander {
 		$bitlyExpanded = $curl->get($query);
 
 		$curl = NULL;
-		
+
 		if ($bitlyExpanded) {
 			$bitlyExpanded = json_decode($bitlyExpanded, TRUE);
 		}
@@ -190,7 +188,7 @@ class UrlExpander {
 
 		$googlExpanded = $curl->get($query);
 		$googlExpanded = json_decode($googlExpanded, TRUE);
-		
+
 		$curl = NULL;
 
 		if ($googlExpanded['status'] != 'OK') { // if there's an error
@@ -259,24 +257,15 @@ class UrlExpander {
 	}
 
 
-	public function getDbh() {
-		if (!$this->_dbh) {
-			$this->_dbh = new DbHandle();
-		}
-		
-		return $this->_dbh;
-	}
-
-
 	public function getCurl() {
 		if (!$this->_curl) {
 			$this->_curl = new Curl();
 		}
-		
+
 		return $this->_curl;
 	}
-	
-	
+
+
 	public function __destruct() {
 		$this->_curl = NULL;
 		$this->_dbh = NULL;
