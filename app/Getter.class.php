@@ -36,9 +36,9 @@ class Getter extends DbUser {
 
 			$params = array(
 				'date' => array('value' => $date, 'type' => \PDO::PARAM_STR),
-				'hours' => $array('value' => hours, 'type' => \PDO::PARAM_INT),
+				'hours' => $array('value' => $hours, 'type' => \PDO::PARAM_INT),
 				'min_weighted_count' => $array('value' => min_weighted_count, 'type' => \PDO::PARAM_INT),
-				'limit' => $array('value' => limit, 'type' => \PDO::PARAM_INT)
+				'limit' => $array('value' => $limit, 'type' => \PDO::PARAM_INT)
 			);
 
 			$sth = $this->execute($sql, $params);
